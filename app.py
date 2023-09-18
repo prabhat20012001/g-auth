@@ -2,7 +2,7 @@ import os
 import pathlib
 
 import requests
-from flask import Flask, session, abort, redirect, request
+from flask import Flask, session, abort, redirect, request, render_template_string
 from google.oauth2 import id_token
 from google_auth_oauthlib.flow import Flow
 from pip._vendor import cachecontrol
@@ -13,7 +13,7 @@ app.secret_key = "CodeSpecialist.com"
 
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
-GOOGLE_CLIENT_ID = "33674737284-srfbp7srvi8ie2m0sr426fved0hjq2tp.apps.googleusercontent.com"
+GOOGLE_CLIENT_ID = "749463331207-r0r75tm6lad3ucntnalhcvq9it30m6bf.apps.googleusercontent.com"
 client_secrets_file = os.path.join(pathlib.Path(__file__).parent, "client_secret.json")
 
 flow = Flow.from_client_secrets_file(
@@ -48,6 +48,8 @@ def callback():
         abort(500)  # State does not match!
 
     credentials = flow.credentials
+
+    # Fetch user information
     request_session = requests.session()
     cached_session = cachecontrol.CacheControl(request_session)
     token_request = google.auth.transport.requests.Request(session=cached_session)
@@ -60,6 +62,11 @@ def callback():
 
     session["google_id"] = id_info.get("sub")
     session["name"] = id_info.get("name")
+    session["profile_picture"] = id_info.get("picture")
+
+    # Store the user's email address in the session
+    session["email"] = id_info.get("email")
+
     return redirect("/protected_area")
 
 
@@ -71,13 +78,27 @@ def logout():
 
 @app.route("/")
 def index():
-    return "Hello World <a href='/login'><button>Login</button></a>"
+    return "Hello World <br><a href='/login'><button>Login</button></a>"
 
 
 @app.route("/protected_area")
 @login_is_required
 def protected_area():
-    return f"Hello {session['name']}! <br/> <a href='/logout'><button>Logout</button></a>"
+    username = session['name']
+    profile_picture = session.get('profile_picture')
+    email = session.get('email')  # Retrieve the user's email from the session
+
+    # HTML template to display the user's profile picture, username, and email
+    html_template = f"Hello {username}!<br/>"
+    if profile_picture:
+        html_template += f"<img src='{profile_picture}' alt='Profile Picture'><br/>"
+
+    if email:
+        html_template += f"Email: {email}<br/>"
+
+    html_template += "<a href='/logout'><button>Logout</button></a>"
+
+    return render_template_string(html_template)
 
 
 if __name__ == "__main__":
